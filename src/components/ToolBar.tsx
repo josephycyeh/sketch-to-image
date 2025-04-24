@@ -13,59 +13,62 @@ const Toolbar: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <View style={styles.row}>
-        <ToolButton
-          iconName="brush"
-          onPress={() =>
-            dispatch({
-              type: 'SET_TOOL',
-              tool: 'brush',
-            })
-          }
-          active={currentTool === 'brush'}
-        />
-        <ToolButton
-          iconName="eraser"
-          onPress={() =>
-            dispatch({
-              type: 'SET_TOOL',
-              tool: 'eraser',
-            })
-          }
-          active={currentTool === 'eraser'}
-        />
-        <ToolButton
-          iconName="arrow-undo"
-          onPress={() => dispatch({ type: 'UNDO' })}
-        />
-        <ToolButton
-          iconName="arrow-redo"
-          onPress={() => dispatch({ type: 'REDO' })}
-        />
-        <ToolButton
-          iconName="trash"
-          onPress={() => dispatch({ type: 'CLEAR' })}
-        />
-        <ToolButton
-          iconName="color-palette"
-          onPress={() => setShowColor(true)}
-        />
-      </View>
-      <View style={styles.sliderRow}>
-        <Text style={styles.label}>Size</Text>
-        <Slider
-          style={styles.slider}
-          minimumValue={1}
-          maximumValue={40}
-          step={1}
-          value={currentStrokeWidth}
-          onValueChange={(w) =>
-            dispatch({ type: 'SET_STROKE_WIDTH', width: w })
-          }
-          minimumTrackTintColor={currentColor}
-          maximumTrackTintColor="#444"
-          thumbTintColor={currentColor}
-        />
+      <View style={styles.content}>
+        <View style={styles.row}>
+          <ToolButton
+            iconName="brush"
+            onPress={() =>
+              dispatch({
+                type: 'SET_TOOL',
+                tool: 'brush',
+              })
+            }
+            active={currentTool === 'brush'}
+          />
+          <ToolButton
+            iconName="remove-outline"
+            onPress={() =>
+              dispatch({
+                type: 'SET_TOOL',
+                tool: 'eraser',
+              })
+            }
+            active={currentTool === 'eraser'}
+          />
+          <ToolButton
+            iconName="arrow-undo"
+            onPress={() => dispatch({ type: 'UNDO' })}
+          />
+          <ToolButton
+            iconName="arrow-redo"
+            onPress={() => dispatch({ type: 'REDO' })}
+          />
+          <ToolButton
+            iconName="trash"
+            onPress={() => dispatch({ type: 'CLEAR' })}
+          />
+          <ToolButton
+            iconName="color-palette"
+            onPress={() => setShowColor(true)}
+          />
+        </View>
+
+        <View style={styles.sliderRow}>
+          <Text style={styles.label}>Size</Text>
+          <Slider
+            style={styles.slider}
+            minimumValue={1}
+            maximumValue={40}
+            step={1}
+            value={currentStrokeWidth}
+            onValueChange={(w) =>
+              dispatch({ type: 'SET_STROKE_WIDTH', width: w })
+            }
+            minimumTrackTintColor={currentColor}
+            maximumTrackTintColor="#D1D1D1"
+            thumbTintColor={currentColor}
+          />
+        </View>
       </View>
 
       <ColorPickerModal
@@ -83,31 +86,32 @@ const Toolbar: React.FC = () => {
 
 const styles = StyleSheet.create({
   container: {
-    position: 'absolute',
-    bottom: 24,
-    left: 16,
-    right: 16,
-    backgroundColor: 'rgba(28,28,28,0.9)',
-    borderRadius: 24,
-    padding: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
-    elevation: 10,
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#E5E5E5',
   },
-  row: { flexDirection: 'row', justifyContent: 'space-between' },
+  content: {
+    padding: 16,
+  },
+  row: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
   sliderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 10,
   },
   label: {
-    color: '#EEE',
-    marginRight: 10,
-    width: 30,
+    color: '#666',
+    marginRight: 12,
+    fontSize: 16,
+    fontWeight: '500',
   },
-  slider: { flex: 1, height: 40 },
+  slider: { 
+    flex: 1, 
+    height: 40,
+  },
 });
 
 export default Toolbar;

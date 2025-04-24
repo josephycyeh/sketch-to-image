@@ -3,14 +3,11 @@ import React, { useContext, useRef, useMemo, memo } from 'react';
 import {
   View,
   StyleSheet,
-  Dimensions,
   PanResponder,
 } from 'react-native';
 import type { SkPath } from '@shopify/react-native-skia';
 import { Canvas, Path, Skia } from '@shopify/react-native-skia';
 import { DrawingContext, PathData, Tool } from '../context/DrawingContext';
-
-const { width, height } = Dimensions.get('window');
 
 interface Point {
   x: number;
@@ -101,7 +98,6 @@ const DrawingCanvas: React.FC = () => {
       }
     },
     onPanResponderRelease: () => {
-      // Add final line to current point for a complete stroke
       if (lastPointRef.current && pathRef.current) {
         pathRef.current.lineTo(lastPointRef.current.x, lastPointRef.current.y);
         
@@ -135,14 +131,14 @@ const DrawingCanvas: React.FC = () => {
 const styles = StyleSheet.create({
   container: { 
     flex: 1,
-    backgroundColor: 'transparent',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    overflow: 'hidden',
   },
   canvas: {
-    width,
-    height,
-    backgroundColor: '#fff',
+    width: '100%',
+    height: '100%',
   },
 });
 
-// Wrap the main component with memo
 export default memo(DrawingCanvas);
