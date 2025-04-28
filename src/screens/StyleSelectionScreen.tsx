@@ -1,302 +1,517 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback, memo } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  FlatList,
   TouchableOpacity,
-  Dimensions,
+  FlatList,
+  Image,
+  Platform,
   SafeAreaView,
+  Dimensions,
+  ActivityIndicator,
+  Pressable,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RouteProp } from '@react-navigation/native';
+import type { RootStackParamList } from '../../App';
+import axios from 'axios';
+import { API_KEY, URL } from '@env';
 
-interface StyleOption {
-  id: string;
-  name: string;
-  description: string;
-  icon: string;
-  color: string;
-  backgroundColor: string;
-}
+type StyleSelectionScreenNavigationProp = NativeStackNavigationProp<
+  RootStackParamList,
+  'StyleSelection'
+>;
 
-const STYLES: StyleOption[] = [
-  {
-    id: '1',
-    name: 'Watercolor',
-    description: 'Soft, flowing watercolor artistic style',
-    icon: 'water',
-    color: '#4FACFE',
-    backgroundColor: '#E3F2FD',
-  },
-  {
-    id: '2',
-    name: 'Oil Painting',
-    description: 'Rich, textured classical oil painting',
-    icon: 'color-palette',
-    color: '#FF5E3A',
-    backgroundColor: '#FFF0ED',
-  },
-  {
-    id: '3',
-    name: 'Anime',
-    description: 'Japanese animation style artwork',
-    icon: 'happy',
-    color: '#FF2D55',
-    backgroundColor: '#FFE9EE',
-  },
-  {
-    id: '4',
-    name: 'Digital Art',
-    description: 'Modern digital illustration style',
-    icon: 'desktop',
-    color: '#5856D6',
-    backgroundColor: '#EEEEFF',
-  },
-  {
-    id: '5',
-    name: 'Pencil Sketch',
-    description: 'Detailed pencil drawing style',
-    icon: 'pencil',
-    color: '#34C759',
-    backgroundColor: '#EDFFF1',
-  },
-  {
-    id: '6',
-    name: 'Pop Art',
-    description: 'Bold, vibrant pop art style',
-    icon: 'star',
-    color: '#FF9500',
-    backgroundColor: '#FFF6E9',
-  },
-  {
-    id: '7',
-    name: 'Pixel Art',
-    description: 'Retro-style pixel artwork',
-    icon: 'grid',
-    color: '#BF5AF2',
-    backgroundColor: '#F7EDFF',
-  },
-  {
-    id: '8',
-    name: 'Comic Style',
-    description: 'Bold comic book illustration style',
-    icon: 'book',
-    color: '#FF375F',
-    backgroundColor: '#FFE8EC',
-  },
-];
-
-const { width } = Dimensions.get('window');
-const PADDING = 16;
-const CARD_MARGIN = 8;
-const COLUMN_COUNT = 2;
-const TOTAL_HORIZONTAL_PADDING = PADDING * 2 + CARD_MARGIN * 2 * COLUMN_COUNT;
-const COLUMN_WIDTH = (width - TOTAL_HORIZONTAL_PADDING) / COLUMN_COUNT;
+type StyleSelectionScreenRouteProp = RouteProp<RootStackParamList, 'StyleSelection'>;
 
 interface StyleSelectionScreenProps {
-  onBack: () => void;
-  onContinue: (selectedStyle: StyleOption) => void;
+  navigation: StyleSelectionScreenNavigationProp;
+  route: StyleSelectionScreenRouteProp;
 }
 
-const StyleSelectionScreen: React.FC<StyleSelectionScreenProps> = ({
-  onBack,
-  onContinue,
-}) => {
-  const [selectedStyle, setSelectedStyle] = useState<StyleOption | null>(null);
+interface Style {
+  id: string;
+  name: string;
+  thumbnail: string;
+}
 
-  const renderItem = ({ item }: { item: StyleOption }) => {
-    const isSelected = selectedStyle?.id === item.id;
-    return (
-      <TouchableOpacity
-        style={[
-          styles.styleCard,
-          { backgroundColor: item.backgroundColor },
-          isSelected && styles.selectedCard,
-        ]}
-        onPress={() => setSelectedStyle(item)}
-      >
-        <View style={[styles.iconContainer, { backgroundColor: item.color }]}>
-          <Ionicons name={item.icon as any} size={32} color="#fff" />
-        </View>
-        <View style={styles.cardContent}>
-          <Text style={styles.styleName}>{item.name}</Text>
-          <Text style={styles.styleDescription} numberOfLines={2}>
-            {item.description}
-          </Text>
-        </View>
-        {isSelected && (
-          <View style={[styles.selectedOverlay, { backgroundColor: item.color }]}>
-            <Ionicons name="checkmark-circle" size={24} color="#fff" />
-          </View>
-        )}
-      </TouchableOpacity>
-    );
-  };
+const PRIMARY = '#4A90E2';
+const SECONDARY = '#50E3C2';
+const BG_GRADIENT: [string, string] = ['#f7fbff', '#eaf6ff'];
+const CARD_BORDER = PRIMARY;
+const BUTTON_BG = PRIMARY;
+const BUTTON_BG_DISABLED = '#D1E6FA';
+const BUTTON_TEXT = '#fff';
+const BUTTON_TEXT_DISABLED = '#A0A0A0';
+
+// Memoized style card component for better performance and refined design
+const StyleCard = memo(({ 
+  item, 
+  isSelected, 
+  onSelect 
+}: { 
+  item: Style; 
+  isSelected: boolean; 
+  onSelect: (style: Style) => void;
+}) => {
+  const [imageLoading, setImageLoading] = useState(true);
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={onBack} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#007AFF" />
+    <Pressable
+      style={({ pressed }) => [
+        componentStyles.styleCard,
+        isSelected && componentStyles.selectedCard,
+        pressed && componentStyles.cardPressed,
+      ]}
+      onPress={() => onSelect(item)}
+      android_ripple={{ color: '#eaf6ff' }}
+    >
+      <View style={componentStyles.imageWrapper}>
+        {imageLoading && (
+          <View style={componentStyles.imagePlaceholder}>
+            <ActivityIndicator size="small" color={PRIMARY} />
+          </View>
+        )}
+        <Image
+          source={{ 
+            uri: item.thumbnail,
+            cache: 'force-cache',
+          }}
+          style={[
+            componentStyles.thumbnail,
+            imageLoading && { opacity: 0 }
+          ]}
+          resizeMode="cover"
+          onLoadStart={() => setImageLoading(true)}
+          onLoad={() => setImageLoading(false)}
+        />
+        {/* Overlay with style name */}
+        <LinearGradient
+          colors={['transparent', 'rgba(0,0,0,0.55)']}
+          style={componentStyles.labelOverlay}
+        >
+          <Text style={componentStyles.styleName}>{item.name}</Text>
+        </LinearGradient>
+      </View>
+    </Pressable>
+  );
+});
+
+const StyleSelectionScreen: React.FC<StyleSelectionScreenProps> = ({
+  navigation,
+  route,
+}) => {
+  const [selectedStyle, setSelectedStyle] = useState<string | null>(null);
+  const [styles, setStyles] = useState<Style[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const { sketchImage } = route.params;
+
+  useEffect(() => {
+    const fetchStyles = async () => {
+      try {
+        const response = await axios.get(`${URL}/styles`, {
+          headers: {
+            'X-API-Key': API_KEY,
+            'Content-Type': 'application/json'
+          }
+        });
+        if (response.data?.success && Array.isArray(response.data.styles)) {
+          console.log('Styles set:', response.data.styles);
+          setStyles(response.data.styles);
+        } else {
+          setError('Failed to load styles');
+        }
+      } catch (err) {
+        setError('Failed to load styles. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchStyles();
+  }, []);
+
+  const handleStyleSelect = useCallback((style: Style) => {
+    setSelectedStyle(style.id);
+  }, []);
+
+  const handleContinue = () => {
+    if (selectedStyle) {
+      const style = styles.find(s => s.id === selectedStyle);
+      if (style) {
+        navigation.navigate('Transformation', {
+          sketchImage,
+          selectedStyle: style,
+        });
+      }
+    }
+  };
+
+  const renderItem = useCallback(({ item }: { item: Style }) => {
+    const isSelected = selectedStyle === item.id;
+    return (
+      <StyleCard
+        item={item}
+        isSelected={isSelected}
+        onSelect={handleStyleSelect}
+      />
+    );
+  }, [selectedStyle, handleStyleSelect]);
+
+  const keyExtractor = useCallback((item: Style) => item.id, []);
+
+  const getItemLayout = useCallback((data: ArrayLike<Style> | null | undefined, index: number) => ({
+    length: cardWidth,
+    offset: (cardWidth + 16) * index,
+    index,
+  }), []);
+
+  const renderContent = () => (
+    <SafeAreaView style={containerStyle.container}>
+      <View style={containerStyle.header}>
+        <TouchableOpacity
+          style={containerStyle.backButton}
+          onPress={() => navigation.goBack()}
+        >
+          <Ionicons name="arrow-back" size={24} color={PRIMARY} />
         </TouchableOpacity>
-        <View style={styles.titleContainer}>
-          <Text style={styles.title}>Choose Your Style</Text>
-          <Text style={styles.subtitle}>Select how you want your art to look</Text>
-        </View>
+        <Text style={containerStyle.title}>Choose Style</Text>
+        <View style={containerStyle.backButton} />
       </View>
 
-      <FlatList
-        data={STYLES}
-        renderItem={renderItem}
-        keyExtractor={(item) => item.id}
-        numColumns={2}
-        contentContainerStyle={styles.list}
-        showsVerticalScrollIndicator={false}
-        columnWrapperStyle={styles.columnWrapper}
-      />
-
-      <View style={styles.buttonSection}>
-        <TouchableOpacity
-          style={[
-            styles.continueButton,
-            !selectedStyle && styles.continueButtonDisabled,
-          ]}
-          onPress={() => selectedStyle && onContinue(selectedStyle)}
-          disabled={!selectedStyle}
-        >
-          <Text style={[
-            styles.continueButtonText,
-            !selectedStyle && styles.continueButtonTextDisabled,
-          ]}>
-            Continue
-          </Text>
-          <Ionicons 
-            name="arrow-forward" 
-            size={20} 
-            color={selectedStyle ? "#fff" : "#999"} 
-            style={styles.continueIcon}
+      <View style={containerStyle.sketchContainer}>
+        <View style={containerStyle.sketchWrapper}>
+          <Image
+            source={{ uri: `data:image/png;base64,${sketchImage}` }}
+            style={containerStyle.sketchImage}
+            resizeMode="contain"
           />
-        </TouchableOpacity>
+        </View>
+        <Text style={containerStyle.instruction}>
+          Select a style to transform your sketch
+        </Text>
+      </View>
+
+      <View style={componentStyles.stylesSection}>
+        <FlatList
+          data={styles}
+          renderItem={renderItem}
+          keyExtractor={keyExtractor}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={componentStyles.gridContainer}
+          snapToInterval={cardWidth + 16}
+          decelerationRate="fast"
+          snapToAlignment="center"
+          getItemLayout={getItemLayout}
+          removeClippedSubviews={true}
+          maxToRenderPerBatch={5}
+          windowSize={3}
+          initialNumToRender={3}
+        />
+      </View>
+
+      <View style={componentStyles.footer}>
+        {selectedStyle ? (
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={handleContinue}
+            style={componentStyles.continueWrapper}
+          >
+            <LinearGradient
+              colors={[PRIMARY, SECONDARY]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={componentStyles.continueButton}
+            >
+              <Text style={componentStyles.continueButtonText}>Transform Sketch</Text>
+              <Ionicons
+                name="arrow-forward"
+                size={20}
+                color={BUTTON_TEXT}
+                style={componentStyles.continueIcon}
+              />
+            </LinearGradient>
+          </TouchableOpacity>
+        ) : (
+          <View style={[componentStyles.continueButton, componentStyles.continueButtonDisabled]}>
+            <Text style={componentStyles.continueButtonTextDisabled}>Transform Sketch</Text>
+            <Ionicons
+              name="arrow-forward"
+              size={20}
+              color={BUTTON_TEXT_DISABLED}
+              style={componentStyles.continueIcon}
+            />
+          </View>
+        )}
       </View>
     </SafeAreaView>
   );
+
+  if (loading) {
+    return (
+      <LinearGradient colors={BG_GRADIENT} style={{ flex: 1 }}>
+        <SafeAreaView style={containerStyle.container}>
+          <View style={containerStyle.header}>
+            <TouchableOpacity
+              style={containerStyle.backButton}
+              onPress={() => navigation.goBack()}
+            >
+              <Ionicons name="arrow-back" size={24} color={PRIMARY} />
+            </TouchableOpacity>
+            <Text style={containerStyle.title}>Choose Style</Text>
+            <View style={containerStyle.backButton} />
+          </View>
+          <View style={containerStyle.loadingContainer}>
+            <ActivityIndicator size="large" color={PRIMARY} />
+            <Text style={containerStyle.loadingText}>Loading styles...</Text>
+          </View>
+        </SafeAreaView>
+      </LinearGradient>
+    );
+  }
+
+  if (error) {
+    return (
+      <LinearGradient colors={BG_GRADIENT} style={{ flex: 1 }}>
+        <SafeAreaView style={containerStyle.container}>
+          <View style={containerStyle.header}>
+            <TouchableOpacity
+              style={containerStyle.backButton}
+              onPress={() => navigation.goBack()}
+            >
+              <Ionicons name="arrow-back" size={24} color={PRIMARY} />
+            </TouchableOpacity>
+            <Text style={containerStyle.title}>Choose Style</Text>
+            <View style={containerStyle.backButton} />
+          </View>
+          <View style={containerStyle.errorContainer}>
+            <Ionicons name="alert-circle" size={48} color="#FF3B30" />
+            <Text style={containerStyle.errorText}>{error}</Text>
+            <TouchableOpacity
+              style={containerStyle.retryButton}
+              onPress={() => setLoading(true)}
+            >
+              <Text style={containerStyle.retryButtonText}>Try Again</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </LinearGradient>
+    );
+  }
+
+  return (
+    <LinearGradient colors={BG_GRADIENT} style={{ flex: 1 }}>
+      {renderContent()}
+    </LinearGradient>
+  );
 };
 
-const styles = StyleSheet.create({
+const { width, height } = Dimensions.get('window');
+const cardWidth = width * 0.35;
+const cardHeight = cardWidth * 1.1;
+
+const containerStyle = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: 'transparent',
   },
   header: {
-    padding: PADDING,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E5E5',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: 'transparent',
   },
   backButton: {
-    marginBottom: 8,
-  },
-  titleContainer: {
-    marginLeft: 4,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   title: {
-    fontSize: 28,
+    fontSize: 22,
     fontWeight: '700',
-    color: '#1A1A1A',
-    marginBottom: 4,
+    color: '#222',
+    letterSpacing: 0.2,
   },
-  subtitle: {
+  sketchContainer: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 8,
+    alignItems: 'center',
+  },
+  sketchWrapper: {
+    width: width * 0.8,
+    height: height * 0.35,
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  sketchImage: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#fff',
+  },
+  instruction: {
+    fontSize: 15,
+    color: '#666',
+    marginTop: 10,
+    marginBottom: 12,
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
     fontSize: 16,
     color: '#666',
   },
-  list: {
-    padding: PADDING,
-  },
-  columnWrapper: {
-    justifyContent: 'space-between',
-  },
-  styleCard: {
-    width: COLUMN_WIDTH,
-    borderRadius: 16,
-    marginBottom: 16,
-    overflow: 'hidden',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    padding: 16,
-  },
-  selectedCard: {
-    transform: [{ scale: 1.02 }],
-  },
-  iconContainer: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-  },
-  selectedOverlay: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cardContent: {
+  errorContainer: {
     flex: 1,
-  },
-  styleName: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1A1A1A',
-    marginBottom: 4,
-  },
-  styleDescription: {
-    fontSize: 14,
-    color: '#666',
-    lineHeight: 18,
-  },
-  buttonSection: {
-    padding: 16,
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#E5E5E5',
-  },
-  continueButton: {
-    backgroundColor: '#007AFF',
-    borderRadius: 16,
-    paddingVertical: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#007AFF',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
+    alignItems: 'center',
+    padding: 20,
   },
-  continueButtonDisabled: {
-    backgroundColor: '#E5E5E5',
-    shadowOpacity: 0,
-    elevation: 0,
+  errorText: {
+    marginTop: 12,
+    marginBottom: 20,
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
   },
-  continueButtonText: {
-    color: '#fff',
-    fontSize: 18,
+  retryButton: {
+    backgroundColor: PRIMARY,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: '#FFF',
+    fontSize: 16,
     fontWeight: '600',
-  },
-  continueButtonTextDisabled: {
-    color: '#999',
-  },
-  continueIcon: {
-    marginLeft: 8,
   },
 });
 
-export default StyleSelectionScreen; 
+const componentStyles = StyleSheet.create({
+  stylesSection: {
+    flex: 1,
+    marginTop: 0,
+  },
+  gridContainer: {
+    paddingHorizontal: 20,
+    paddingVertical: 2,
+  },
+  styleCard: {
+    width: cardWidth,
+    height: cardHeight,
+    marginHorizontal: 6,
+    borderRadius: 16,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.04)',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  selectedCard: {
+    borderColor: CARD_BORDER,
+    borderWidth: 2.5,
+  },
+  cardPressed: {
+    opacity: 0.92,
+    transform: [{ scale: 0.98 }],
+  },
+  imageWrapper: {
+    flex: 1,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  thumbnail: {
+    width: '100%',
+    height: '100%',
+  },
+  labelOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingVertical: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  styleName: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#fff',
+    textAlign: 'center',
+  },
+  footer: {
+    padding: 20,
+    paddingBottom: Platform.OS === 'ios' ? 36 : 20,
+    backgroundColor: 'transparent',
+  },
+  continueWrapper: {
+    borderRadius: 14,
+    overflow: 'hidden',
+  },
+  continueButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+  },
+  continueButtonDisabled: {
+    backgroundColor: BUTTON_BG_DISABLED,
+    borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+  },
+  continueButtonText: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: BUTTON_TEXT,
+    marginRight: 8,
+    letterSpacing: 0.2,
+  },
+  continueButtonTextDisabled: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: BUTTON_TEXT_DISABLED,
+    marginRight: 8,
+    letterSpacing: 0.2,
+  },
+  continueIcon: {
+    marginLeft: 4,
+  },
+  imagePlaceholder: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F0F0F0',
+  },
+});
+
+export default StyleSelectionScreen;

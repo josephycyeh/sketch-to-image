@@ -1,5 +1,5 @@
 // src/screens/DrawingScreen.tsx
-import React, { useState, useRef } from 'react';
+import React, { useRef } from 'react';
 import {
   View,
   StyleSheet,
@@ -13,39 +13,36 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as MediaLibrary from 'expo-media-library';
 import { captureRef } from 'react-native-view-shot';
+import { makeImageFromView } from '@shopify/react-native-skia';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../../App';
 import DrawingCanvas from '../components/Canvas';
 import Toolbar from '../components/ToolBar';
-import StyleSelectionScreen from './StyleSelectionScreen';
-import TransformationScreen from './TransformationScreen';
-import { makeImageFromView } from '@shopify/react-native-skia';
-import type { SkImage } from '@shopify/react-native-skia';
+
+type DrawingScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Drawing'>;
+
+interface DrawingScreenProps {
+  navigation: DrawingScreenNavigationProp;
+}
 
 const { width } = Dimensions.get('window');
 
-type Screen = 'drawing' | 'style' | 'transforming';
-
-const DrawingScreen: React.FC = () => {
-  const [currentScreen, setCurrentScreen] = useState<Screen>('drawing');
-  const [selectedStyle, setSelectedStyle] = useState<any>(null);
+const DrawingScreen: React.FC<DrawingScreenProps> = ({ navigation }) => {
   const canvasRef = useRef<View>(null);
-  const [capturedImage, setCapturedImage] = useState<SkImage | null>(null);
 
   const handleSave = async () => {
     try {
-      // Request permission
       const { status } = await MediaLibrary.requestPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert('Permission needed', 'Please grant permission to save drawings');
         return;
       }
 
-      // Capture the canvas view
       const result = await captureRef(canvasRef, {
         format: 'png',
         quality: 1,
       });
 
-      // Save to camera roll
       await MediaLibrary.saveToLibraryAsync(result);
       Alert.alert('Success', 'Drawing saved to your photos!');
     } catch (err) {
@@ -58,36 +55,18 @@ const DrawingScreen: React.FC = () => {
     try {
       if (canvasRef.current) {
         const image = await makeImageFromView(canvasRef);
-        setCapturedImage(image);
+        if (image) {
+          const base64Image = image.encodeToBase64();
+          navigation.navigate('StyleSelection', { sketchImage: base64Image });
+        } else {
+          Alert.alert('Error', 'Failed to capture sketch');
+        }
       }
     } catch (err) {
-      console.error('Failed to capture sketch before style selection:', err);
+      console.error('Failed to capture sketch:', err);
+      Alert.alert('Error', 'Failed to prepare sketch for transformation');
     }
-    setCurrentScreen('style');
   };
-
-  const handleStyleSelect = (style: any) => {
-    setSelectedStyle(style);
-    setCurrentScreen('transforming');
-  };
-
-  if (currentScreen === 'transforming') {
-    return (
-      <TransformationScreen
-        sketchImage={capturedImage}
-        selectedStyle={selectedStyle}
-      />
-    );
-  }
-
-  if (currentScreen === 'style') {
-    return (
-      <StyleSelectionScreen
-        onBack={() => setCurrentScreen('drawing')}
-        onContinue={handleStyleSelect}
-      />
-    );
-  }
 
   return (
     <SafeAreaView style={styles.container}>
