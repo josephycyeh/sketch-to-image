@@ -4,6 +4,7 @@ module.exports = {
     '@babel/preset-typescript',
   ],
   plugins: [
+    'react-native-reanimated/plugin',
     [
       'module:react-native-dotenv',
       {
@@ -14,6 +15,6 @@ module.exports = {
         safe: true,
         allowUndefined: false,
       },
-    ]
+    ],
   ],
 };

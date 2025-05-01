@@ -15,17 +15,17 @@ const ToolButton: React.FC<ToolButtonProps> = ({
   active = false,
 }) => {
   return (
-    <TouchableOpacity
+  <TouchableOpacity
       style={[styles.button, active && styles.activeButton]}
-      onPress={onPress}
-    >
-      <Ionicons
-        name={iconName}
-        size={24}
+    onPress={onPress}
+  >
+    <Ionicons
+      name={iconName}
+      size={24}
         color={active ? '#007AFF' : '#333'}
-      />
-    </TouchableOpacity>
-  );
+    />
+  </TouchableOpacity>
+);
 };
 
 const styles = StyleSheet.create({

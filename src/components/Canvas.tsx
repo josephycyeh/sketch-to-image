@@ -53,10 +53,10 @@ const DrawingCanvas: React.FC = () => {
 
   // Create PanResponder with useMemo for better performance
   const panResponder = useMemo(() => PanResponder.create({
-    onStartShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder: () => true,
-    onPanResponderGrant: (evt) => {
-      const { locationX: x, locationY: y } = evt.nativeEvent;
+      onPanResponderGrant: (evt) => {
+        const { locationX: x, locationY: y } = evt.nativeEvent;
       const newPath = Skia.Path.Make();
       newPath.moveTo(x, y);
       
@@ -95,9 +95,9 @@ const DrawingCanvas: React.FC = () => {
 
         dispatch({ type: 'ADD_PATH', payload: pathData });
         lastPointRef.current = currentPoint;
-      }
-    },
-    onPanResponderRelease: () => {
+        }
+      },
+      onPanResponderRelease: () => {
       if (lastPointRef.current && pathRef.current) {
         pathRef.current.lineTo(lastPointRef.current.x, lastPointRef.current.y);
         
@@ -112,11 +112,11 @@ const DrawingCanvas: React.FC = () => {
       }
       lastPointRef.current = null;
       pathRef.current = null;
-    },
-    onPanResponderTerminate: () => {
+      },
+      onPanResponderTerminate: () => {
       lastPointRef.current = null;
       pathRef.current = null;
-    },
+      },
   }), [currentColor, currentStrokeWidth, currentTool]);
 
   return (

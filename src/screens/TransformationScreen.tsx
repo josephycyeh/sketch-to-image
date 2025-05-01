@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,16 +6,21 @@ import {
   Image,
   TouchableOpacity,
   Dimensions,
-  Platform,
+  Share,
+  Alert,
+  SafeAreaView,
+  StatusBar,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
 import type { RootStackParamList } from '../../App';
 import axios from 'axios';
-import LottieView from 'lottie-react-native';
+import * as MediaLibrary from 'expo-media-library';
+import * as FileSystem from 'expo-file-system';
 import { API_KEY, URL } from '@env';
+import { COLORS, GRADIENT_COLORS } from '../constants/theme';
+import ActionButton from '../components/buttons/ActionButton';
 
 type TransformationScreenNavigationProp = NativeStackNavigationProp<
   RootStackParamList,
@@ -33,17 +38,14 @@ const TransformationScreen: React.FC<TransformationScreenProps> = ({
   navigation,
   route,
 }) => {
-  const [transformedImage, setTransformedImage] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [transformedImage, setTransformedImage] = useState<string | null>(route.params.transformedImage || null);
+  const [saving, setSaving] = useState(false);
   const { sketchImage, selectedStyle } = route.params;
 
   useEffect(() => {
+    if (route.params.transformedImage) return;
     const transformImage = async () => {
       try {
-        setLoading(true);
-        setError(null);
-        
         const response = await axios.post(`${URL}/generate-image`, {
           image: sketchImage,
           style: selectedStyle.id,
@@ -63,262 +65,157 @@ const TransformationScreen: React.FC<TransformationScreenProps> = ({
       } catch (err) {
         console.error('Transform error:', err);
         if (axios.isAxiosError(err) && err.response?.status === 401) {
-          setError('Invalid API key. Please check your configuration.');
+          Alert.alert('Error', 'Invalid API key. Please check your configuration.');
         } else if (axios.isAxiosError(err) && err.response?.status === 429) {
-          setError('Too many requests. Please try again later.');
+          Alert.alert('Error', 'Too many requests. Please try again later.');
         } else {
-          setError('Failed to transform image. Please try again.');
+          Alert.alert('Error', 'Failed to transform image. Please try again.');
         }
-      } finally {
-        setLoading(false);
       }
     };
-
     transformImage();
-  }, [sketchImage, selectedStyle]);
+  }, [sketchImage, selectedStyle, route.params.transformedImage]);
 
-  const handleRetry = () => {
-    setLoading(true); // This will trigger the useEffect to try again
-  };
+  const handleShare = useCallback(async () => {
+    if (!transformedImage) return;
+    
+    try {
+      const uri = FileSystem.cacheDirectory + 'transformed-sketch.png';
+      await FileSystem.writeAsStringAsync(uri, transformedImage, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      
+      await Share.share({
+        url: uri,
+        message: 'Check out my transformed sketch!',
+      });
+    } catch (err) {
+      Alert.alert('Error', 'Failed to share image');
+    }
+  }, [transformedImage]);
 
-  const handleDone = () => {
+  const handleSave = useCallback(async () => {
+    if (!transformedImage) return;
+    
+    try {
+      setSaving(true);
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      
+      if (status !== 'granted') {
+        Alert.alert('Permission Required', 'Please allow access to save images');
+        return;
+      }
+
+      const uri = FileSystem.cacheDirectory + 'transformed-sketch.png';
+      await FileSystem.writeAsStringAsync(uri, transformedImage, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      
+      await MediaLibrary.saveToLibraryAsync(uri);
+      Alert.alert('Success', 'Image saved to your photos!');
+    } catch (err) {
+      Alert.alert('Error', 'Failed to save image');
+    } finally {
+      setSaving(false);
+    }
+  }, [transformedImage]);
+
+  const handleDone = useCallback(() => {
     navigation.navigate('Drawing');
-  };
-
-  if (loading) {
-    return (
-      <View style={styles.container}>
-        <LinearGradient
-          colors={['#4A90E2', '#50E3C2']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.gradientBackground}
-        >
-          <View style={styles.loadingContainer}>
-            <LottieView
-              source={require('../../assets/animations/transform.json')}
-              autoPlay
-              loop
-              style={styles.lottieAnimation}
-            />
-            <Text style={styles.loadingText}>Transforming your sketch...</Text>
-            <Text style={styles.subText}>This may take a moment</Text>
-          </View>
-        </LinearGradient>
-      </View>
-    );
-  }
-
-  if (error) {
-    return (
-      <View style={styles.container}>
-        <LinearGradient
-          colors={['#FF6B6B', '#FF8E53']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.gradientBackground}
-        >
-          <View style={styles.errorContainer}>
-            <Ionicons name="alert-circle" size={80} color="#FFF" />
-            <Text style={[styles.errorText, { color: '#FFF' }]}>{error}</Text>
-            <TouchableOpacity style={styles.retryButton} onPress={handleRetry}>
-              <Text style={styles.retryButtonText}>Try Again</Text>
-            </TouchableOpacity>
-          </View>
-        </LinearGradient>
-      </View>
-    );
-  }
+  }, [navigation]);
 
   return (
     <View style={styles.container}>
+      <StatusBar barStyle="light-content" />
       <LinearGradient
-        colors={['#4A90E2', '#50E3C2']}
+        colors={GRADIENT_COLORS.PRIMARY}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={styles.header}
+        style={styles.fullScreenGradient}
       >
-        <Text style={styles.title}>Your Transformed Art</Text>
+        <SafeAreaView style={[styles.safeArea, { marginTop: 120 }]}>
+          <View style={styles.content}>
+            <View style={styles.resultCanvasWrapper}>
+              {transformedImage && (
+                <Image
+                  source={{ uri: `data:image/png;base64,${transformedImage}` }}
+                  style={styles.transformedImage}
+                  resizeMode="contain"
+                />
+              )}
+            </View>
+
+            <View style={styles.actionsContainer}>
+              <ActionButton
+                onPress={handleShare}
+                icon="share-outline"
+                text="Share"
+                size="medium"
+              />
+              <ActionButton
+                onPress={handleSave}
+                icon={saving ? "cloud-download-outline" : "save-outline"}
+                text={saving ? 'Saving...' : 'Save'}
+                size="medium"
+                disabled={saving}
+              />
+            </View>
+
+            <ActionButton
+              onPress={handleDone}
+              icon="checkmark"
+              text="Done"
+              size="large"
+            />
+          </View>
+        </SafeAreaView>
       </LinearGradient>
-
-      <View style={styles.imageContainer}>
-        {transformedImage && (
-          <Image
-            source={{ uri: `data:image/png;base64,${transformedImage}` }}
-            style={styles.transformedImage}
-            resizeMode="contain"
-          />
-        )}
-      </View>
-
-      <View style={styles.footer}>
-        <TouchableOpacity
-          style={styles.doneButton}
-          onPress={handleDone}
-        >
-          <LinearGradient
-            colors={['#FF6B6B', '#FF8E53']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.gradientButton}
-          >
-            <Text style={styles.doneButtonText}>Done</Text>
-            <Ionicons name="checkmark" size={24} color="#fff" style={styles.doneIcon} />
-          </LinearGradient>
-        </TouchableOpacity>
-      </View>
     </View>
   );
 };
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
   },
-  gradientBackground: {
+  fullScreenGradient: {
     flex: 1,
-    width: '100%',
   },
-  header: {
-    padding: 20,
-    paddingTop: Platform.OS === 'ios' ? 60 : 20,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
-    alignItems: 'center',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.2,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 4,
-      },
-    }),
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#FFF',
-    textShadowColor: 'rgba(0, 0, 0, 0.1)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-  },
-  loadingContainer: {
+  safeArea: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 32,
   },
-  lottieAnimation: {
-    width: width * 0.6,
-    height: width * 0.6,
-  },
-  loadingText: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: '#FFF',
-    marginTop: 24,
-    textAlign: 'center',
-    textShadowColor: 'rgba(0, 0, 0, 0.1)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-  },
-  subText: {
-    fontSize: 18,
-    color: 'rgba(255, 255, 255, 0.8)',
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  errorContainer: {
+  content: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 32,
+    paddingHorizontal: 20,
+    paddingTop: 36,
   },
-  errorText: {
-    fontSize: 20,
-    textAlign: 'center',
-    marginTop: 16,
-    marginBottom: 24,
-    color: '#FFF',
-    textShadowColor: 'rgba(0, 0, 0, 0.1)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-  },
-  retryButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 32,
-    paddingVertical: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.4)',
-  },
-  retryButtonText: {
-    color: '#FFF',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  imageContainer: {
-    flex: 1,
-    margin: 16,
-    backgroundColor: '#FFF',
-    borderRadius: 20,
-    padding: 12,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 4,
-      },
-    }),
+  resultCanvasWrapper: {
+    width: width * 0.9,
+    height: height * 0.45,
+    backgroundColor: COLORS.WHITE,
+    borderRadius: 24,
+    overflow: 'hidden',
+    elevation: 4,
+    shadowColor: COLORS.TEXT.PRIMARY,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    alignSelf: 'center',
+    marginBottom: 36,
   },
   transformedImage: {
     flex: 1,
-    borderRadius: 16,
+    width: '100%',
+    height: '100%',
   },
-  footer: {
-    padding: 16,
-    paddingBottom: Platform.OS === 'ios' ? 32 : 16,
-  },
-  doneButton: {
-    borderRadius: 16,
-    overflow: 'hidden',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.2,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 4,
-      },
-    }),
-  },
-  gradientButton: {
+  actionsContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-  },
-  doneButtonText: {
-    color: '#FFF',
-    fontSize: 20,
-    fontWeight: '600',
-    marginRight: 8,
-  },
-  doneIcon: {
-    marginLeft: 4,
+    gap: 12,
+    marginBottom: 32,
+    paddingHorizontal: 20,
   },
 });
 

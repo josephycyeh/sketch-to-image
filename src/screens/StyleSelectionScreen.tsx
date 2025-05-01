@@ -6,11 +6,11 @@ import {
   TouchableOpacity,
   FlatList,
   Image,
-  Platform,
   SafeAreaView,
   Dimensions,
   ActivityIndicator,
   Pressable,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -19,6 +19,12 @@ import type { RouteProp } from '@react-navigation/native';
 import type { RootStackParamList } from '../../App';
 import axios from 'axios';
 import { API_KEY, URL } from '@env';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import StyleSelectionHeader from '../components/StyleSelectionHeader';
+import { COLORS, GRADIENT_COLORS } from '../constants/theme';
+import { MODEL_OPTIONS, ModelType } from '../constants/models';
+import ActionButton from '../components/buttons/ActionButton';
+import Superwall from '@superwall/react-native-superwall';
 
 type StyleSelectionScreenNavigationProp = NativeStackNavigationProp<
   RootStackParamList,
@@ -36,6 +42,7 @@ interface Style {
   id: string;
   name: string;
   thumbnail: string;
+  paid?: boolean;
 }
 
 const PRIMARY = '#4A90E2';
@@ -59,6 +66,10 @@ const StyleCard = memo(({
 }) => {
   const [imageLoading, setImageLoading] = useState(true);
 
+  useEffect(() => {
+    setImageLoading(true);
+  }, [item.thumbnail]);
+
   return (
     <Pressable
       style={({ pressed }) => [
@@ -72,7 +83,7 @@ const StyleCard = memo(({
       <View style={componentStyles.imageWrapper}>
         {imageLoading && (
           <View style={componentStyles.imagePlaceholder}>
-            <ActivityIndicator size="small" color={PRIMARY} />
+            <ActivityIndicator size="small" color={COLORS.PRIMARY} />
           </View>
         )}
         <Image
@@ -85,8 +96,7 @@ const StyleCard = memo(({
             imageLoading && { opacity: 0 }
           ]}
           resizeMode="cover"
-          onLoadStart={() => setImageLoading(true)}
-          onLoad={() => setImageLoading(false)}
+          onLoadEnd={() => setImageLoading(false)}
         />
         {/* Overlay with style name */}
         <LinearGradient
@@ -95,6 +105,11 @@ const StyleCard = memo(({
         >
           <Text style={componentStyles.styleName}>{item.name}</Text>
         </LinearGradient>
+        {item.paid && (
+          <View style={componentStyles.proBadge}>
+            <Text style={componentStyles.proBadgeText}>PRO</Text>
+          </View>
+        )}
       </View>
     </Pressable>
   );
@@ -107,8 +122,9 @@ const StyleSelectionScreen: React.FC<StyleSelectionScreenProps> = ({
   const [selectedStyle, setSelectedStyle] = useState<string | null>(null);
   const [styles, setStyles] = useState<Style[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [selectedModel, setSelectedModel] = useState<ModelType>('gemini');
   const { sketchImage } = route.params;
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     const fetchStyles = async () => {
@@ -120,13 +136,12 @@ const StyleSelectionScreen: React.FC<StyleSelectionScreenProps> = ({
           }
         });
         if (response.data?.success && Array.isArray(response.data.styles)) {
-          console.log('Styles set:', response.data.styles);
           setStyles(response.data.styles);
         } else {
-          setError('Failed to load styles');
+          throw new Error('Failed to load styles');
         }
       } catch (err) {
-        setError('Failed to load styles. Please try again.');
+        Alert.alert('Error', 'Failed to load styles. Please try again.');
       } finally {
         setLoading(false);
       }
@@ -134,21 +149,41 @@ const StyleSelectionScreen: React.FC<StyleSelectionScreenProps> = ({
     fetchStyles();
   }, []);
 
-  const handleStyleSelect = useCallback((style: Style) => {
-    setSelectedStyle(style.id);
+  const handleModelSwitch = useCallback((model: ModelType) => {
+    Superwall.shared.register({
+      placement: 'ModelSwitch',
+      feature: () => {
+        setSelectedModel(model);
+      }
+    });
   }, []);
 
-  const handleContinue = () => {
+  const handleStyleSelect = useCallback((style: Style) => {
+    Superwall.shared.register({
+      placement: 'StyleSelect',
+      feature: () => {
+        setSelectedStyle(style.id);
+      }
+    });
+  }, []);
+
+  const handleContinue = useCallback(() => {
     if (selectedStyle) {
       const style = styles.find(s => s.id === selectedStyle);
       if (style) {
-        navigation.navigate('Transformation', {
-          sketchImage,
-          selectedStyle: style,
+        Superwall.shared.register({
+          placement: 'TransformSketch',
+          feature: () => {
+            navigation.navigate('Transforming', {
+              sketchImage,
+              selectedStyle: style,
+              model: selectedModel,
+            });
+          }
         });
       }
     }
-  };
+  }, [selectedStyle, styles, navigation, sketchImage, selectedModel]);
 
   const renderItem = useCallback(({ item }: { item: Style }) => {
     const isSelected = selectedStyle === item.id;
@@ -171,17 +206,7 @@ const StyleSelectionScreen: React.FC<StyleSelectionScreenProps> = ({
 
   const renderContent = () => (
     <SafeAreaView style={containerStyle.container}>
-      <View style={containerStyle.header}>
-        <TouchableOpacity
-          style={containerStyle.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Ionicons name="arrow-back" size={24} color={PRIMARY} />
-        </TouchableOpacity>
-        <Text style={containerStyle.title}>Choose Style</Text>
-        <View style={containerStyle.backButton} />
-      </View>
-
+      {/* Sketch and rest of UI */}
       <View style={containerStyle.sketchContainer}>
         <View style={containerStyle.sketchWrapper}>
           <Image
@@ -190,9 +215,31 @@ const StyleSelectionScreen: React.FC<StyleSelectionScreenProps> = ({
             resizeMode="contain"
           />
         </View>
-        <Text style={containerStyle.instruction}>
-          Select a style to transform your sketch
+        {/* Single compact instruction */}
+        <Text style={containerStyle.toggleInstruction}>
+          Select a model and style to transform your sketch
         </Text>
+        {/* Modern pill/segmented toggle */}
+        <View style={containerStyle.modelToggleWrapper}>
+          {MODEL_OPTIONS.map(option => (
+            <TouchableOpacity
+              key={option.value}
+              style={[
+                containerStyle.modelToggleButton,
+                selectedModel === option.value && containerStyle.modelToggleButtonActive
+              ]}
+              onPress={() => handleModelSwitch(option.value as ModelType)}
+              activeOpacity={0.85}
+            >
+              <Text style={[
+                containerStyle.modelToggleText,
+                selectedModel === option.value && containerStyle.modelToggleTextActive
+              ]}>
+                {option.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
       </View>
 
       <View style={componentStyles.stylesSection}>
@@ -216,36 +263,22 @@ const StyleSelectionScreen: React.FC<StyleSelectionScreenProps> = ({
 
       <View style={componentStyles.footer}>
         {selectedStyle ? (
-          <TouchableOpacity
-            activeOpacity={0.85}
+          <ActionButton
             onPress={handleContinue}
-            style={componentStyles.continueWrapper}
-          >
-            <LinearGradient
-              colors={[PRIMARY, SECONDARY]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={componentStyles.continueButton}
-            >
-              <Text style={componentStyles.continueButtonText}>Transform Sketch</Text>
-              <Ionicons
-                name="arrow-forward"
-                size={20}
-                color={BUTTON_TEXT}
-                style={componentStyles.continueIcon}
-              />
-            </LinearGradient>
-          </TouchableOpacity>
+            text="Transform Sketch"
+            icon="arrow-forward"
+            size="large"
+            variant="primary"
+          />
         ) : (
-          <View style={[componentStyles.continueButton, componentStyles.continueButtonDisabled]}>
-            <Text style={componentStyles.continueButtonTextDisabled}>Transform Sketch</Text>
-            <Ionicons
-              name="arrow-forward"
-              size={20}
-              color={BUTTON_TEXT_DISABLED}
-              style={componentStyles.continueIcon}
-            />
-          </View>
+          <ActionButton
+            onPress={() => {}}
+            text="Transform Sketch"
+            icon="arrow-forward"
+            size="large"
+            variant="primary"
+            disabled
+          />
         )}
       </View>
     </SafeAreaView>
@@ -253,50 +286,11 @@ const StyleSelectionScreen: React.FC<StyleSelectionScreenProps> = ({
 
   if (loading) {
     return (
-      <LinearGradient colors={BG_GRADIENT} style={{ flex: 1 }}>
+      <LinearGradient colors={GRADIENT_COLORS.PRIMARY} style={{ flex: 1 }}>
         <SafeAreaView style={containerStyle.container}>
-          <View style={containerStyle.header}>
-            <TouchableOpacity
-              style={containerStyle.backButton}
-              onPress={() => navigation.goBack()}
-            >
-              <Ionicons name="arrow-back" size={24} color={PRIMARY} />
-            </TouchableOpacity>
-            <Text style={containerStyle.title}>Choose Style</Text>
-            <View style={containerStyle.backButton} />
-          </View>
           <View style={containerStyle.loadingContainer}>
-            <ActivityIndicator size="large" color={PRIMARY} />
+            <ActivityIndicator size="large" color={COLORS.WHITE} />
             <Text style={containerStyle.loadingText}>Loading styles...</Text>
-          </View>
-        </SafeAreaView>
-      </LinearGradient>
-    );
-  }
-
-  if (error) {
-    return (
-      <LinearGradient colors={BG_GRADIENT} style={{ flex: 1 }}>
-        <SafeAreaView style={containerStyle.container}>
-          <View style={containerStyle.header}>
-            <TouchableOpacity
-              style={containerStyle.backButton}
-              onPress={() => navigation.goBack()}
-            >
-              <Ionicons name="arrow-back" size={24} color={PRIMARY} />
-            </TouchableOpacity>
-            <Text style={containerStyle.title}>Choose Style</Text>
-            <View style={containerStyle.backButton} />
-          </View>
-          <View style={containerStyle.errorContainer}>
-            <Ionicons name="alert-circle" size={48} color="#FF3B30" />
-            <Text style={containerStyle.errorText}>{error}</Text>
-            <TouchableOpacity
-              style={containerStyle.retryButton}
-              onPress={() => setLoading(true)}
-            >
-              <Text style={containerStyle.retryButtonText}>Try Again</Text>
-            </TouchableOpacity>
           </View>
         </SafeAreaView>
       </LinearGradient>
@@ -312,32 +306,11 @@ const StyleSelectionScreen: React.FC<StyleSelectionScreenProps> = ({
 
 const { width, height } = Dimensions.get('window');
 const cardWidth = width * 0.35;
-const cardHeight = cardWidth * 1.1;
 
 const containerStyle = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: 'transparent',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: 'transparent',
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#222',
-    letterSpacing: 0.2,
   },
   sketchContainer: {
     paddingHorizontal: 20,
@@ -361,14 +334,6 @@ const containerStyle = StyleSheet.create({
     width: '100%',
     height: '100%',
     backgroundColor: '#fff',
-  },
-  instruction: {
-    fontSize: 15,
-    color: '#666',
-    marginTop: 10,
-    marginBottom: 12,
-    textAlign: 'center',
-    fontWeight: '500',
   },
   loadingContainer: {
     flex: 1,
@@ -404,6 +369,51 @@ const containerStyle = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  modelToggleWrapper: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#eaf6ff',
+    borderRadius: 24,
+    padding: 4,
+    marginTop: 8,
+    marginBottom: 16,
+    alignSelf: 'center',
+  },
+  modelToggleButton: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modelToggleButtonActive: {
+    backgroundColor: COLORS.PRIMARY,
+    shadowColor: COLORS.PRIMARY,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  modelToggleText: {
+    fontSize: 15,
+    color: COLORS.PRIMARY,
+    fontWeight: '500',
+  },
+  modelToggleTextActive: {
+    color: COLORS.TEXT.LIGHT,
+    fontWeight: '700',
+  },
+  toggleInstruction: {
+    fontSize: 13,
+    color: '#7a8fa6',
+    textAlign: 'center',
+    marginTop: 18,
+    marginBottom: 6,
+    fontWeight: '500',
+    letterSpacing: 0.1,
+  },
 });
 
 const componentStyles = StyleSheet.create({
@@ -417,7 +427,7 @@ const componentStyles = StyleSheet.create({
   },
   styleCard: {
     width: cardWidth,
-    height: cardHeight,
+    height: cardWidth * 1.1,
     marginHorizontal: 6,
     borderRadius: 16,
     backgroundColor: '#fff',
@@ -463,44 +473,8 @@ const componentStyles = StyleSheet.create({
     textAlign: 'center',
   },
   footer: {
-    padding: 20,
-    paddingBottom: Platform.OS === 'ios' ? 36 : 20,
-    backgroundColor: 'transparent',
-  },
-  continueWrapper: {
-    borderRadius: 14,
-    overflow: 'hidden',
-  },
-  continueButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-  },
-  continueButtonDisabled: {
-    backgroundColor: BUTTON_BG_DISABLED,
-    borderRadius: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-  },
-  continueButtonText: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: BUTTON_TEXT,
-    marginRight: 8,
-    letterSpacing: 0.2,
-  },
-  continueButtonTextDisabled: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: BUTTON_TEXT_DISABLED,
-    marginRight: 8,
-    letterSpacing: 0.2,
-  },
-  continueIcon: {
-    marginLeft: 4,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
   },
   imagePlaceholder: {
     position: 'absolute',
@@ -511,6 +485,26 @@ const componentStyles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#F0F0F0',
+  },
+  proBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: COLORS.PRIMARY,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 2,
+    elevation: 3,
+  },
+  proBadgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
 });
 

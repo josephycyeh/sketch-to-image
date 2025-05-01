@@ -1,23 +1,21 @@
 // src/screens/DrawingScreen.tsx
-import React, { useRef } from 'react';
+import React, { useRef, useCallback } from 'react';
 import {
   View,
   StyleSheet,
-  TouchableOpacity,
   Text,
   SafeAreaView,
-  Dimensions,
   Alert,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-import * as MediaLibrary from 'expo-media-library';
-import { captureRef } from 'react-native-view-shot';
-import { makeImageFromView } from '@shopify/react-native-skia';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../App';
+import * as MediaLibrary from 'expo-media-library';
+import { captureRef } from 'react-native-view-shot';
 import DrawingCanvas from '../components/Canvas';
 import Toolbar from '../components/ToolBar';
+import ActionButton from '../components/buttons/ActionButton';
+import CircleButton from '../components/buttons/CircleButton';
+import { COLORS } from '../constants/theme';
 
 type DrawingScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Drawing'>;
 
@@ -25,12 +23,13 @@ interface DrawingScreenProps {
   navigation: DrawingScreenNavigationProp;
 }
 
-const { width } = Dimensions.get('window');
+// Base64 string of a completely white/empty canvas
+const EMPTY_CANVAS_BASE64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=";
 
 const DrawingScreen: React.FC<DrawingScreenProps> = ({ navigation }) => {
   const canvasRef = useRef<View>(null);
 
-  const handleSave = async () => {
+  const handleSave = useCallback(async () => {
     try {
       const { status } = await MediaLibrary.requestPermissionsAsync();
       if (status !== 'granted') {
@@ -49,60 +48,49 @@ const DrawingScreen: React.FC<DrawingScreenProps> = ({ navigation }) => {
       Alert.alert('Error', 'Failed to save drawing');
       console.error(err);
     }
-  };
+  }, []);
 
-  const handleTransformSketch = async () => {
+  const handleTransformSketch = useCallback(async () => {
     try {
-      if (canvasRef.current) {
-        const image = await makeImageFromView(canvasRef);
-        if (image) {
-          const base64Image = image.encodeToBase64();
-          navigation.navigate('StyleSelection', { sketchImage: base64Image });
-        } else {
-          Alert.alert('Error', 'Failed to capture sketch');
-        }
+      if (!canvasRef.current) return;
+
+      const image = await captureRef(canvasRef, {
+        format: 'png',
+        quality: 1,
+        result: 'base64'
+      });
+
+      if (!image) {
+        Alert.alert('Error', 'Failed to capture sketch');
+        return;
       }
+
+      if (image === EMPTY_CANVAS_BASE64) {
+        Alert.alert('Error', 'You need to draw something before you transform!');
+        return;
+      }
+
+      navigation.navigate('StyleSelection', { sketchImage: image });
     } catch (err) {
       console.error('Failed to capture sketch:', err);
       Alert.alert('Error', 'Failed to prepare sketch for transformation');
     }
-  };
+  }, [navigation]);
 
   return (
     <SafeAreaView style={styles.container}>
-      <LinearGradient
-        colors={['#4A90E2', '#50E3C2']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.header}
-      >
-        <View style={styles.titleContainer}>
-          <View style={styles.iconContainer}>
-            <Ionicons name="brush" size={24} color="#fff" />
-          </View>
-          <Text style={styles.title}>Create Your Sketch</Text>
-        </View>
-        <Text style={styles.subtitle}>Draw anything and transform it into art!</Text>
-      </LinearGradient>
-      
       <View style={styles.canvasSection}>
-        <View style={styles.decorationCircle} />
-        <View style={styles.decorationSquare} />
         <View style={styles.canvasContainer}>
           <View ref={canvasRef} collapsable={false} style={styles.canvasInner}>
             <DrawingCanvas />
           </View>
           <View style={styles.canvasOverlay} pointerEvents="none" />
-          <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-            <LinearGradient
-              colors={['rgba(74, 144, 226, 0.9)', 'rgba(80, 227, 194, 0.9)']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.saveButtonGradient}
-            >
-              <Ionicons name="save-outline" size={18} color="#fff" />
-            </LinearGradient>
-          </TouchableOpacity>
+          <CircleButton
+            onPress={handleSave}
+            icon="save-outline"
+            gradient
+            style={styles.saveButton}
+          />
         </View>
       </View>
       
@@ -111,20 +99,12 @@ const DrawingScreen: React.FC<DrawingScreenProps> = ({ navigation }) => {
       </View>
       
       <View style={styles.buttonSection}>
-        <LinearGradient
-          colors={['#FF6B6B', '#FF8E53']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.transformButton}
-        >
-          <TouchableOpacity
-            style={styles.transformButtonContent}
-            onPress={handleTransformSketch}
-          >
-            <Ionicons name="sparkles" size={24} color="#fff" style={styles.buttonIcon} />
-            <Text style={styles.buttonText}>Transform Sketch</Text>
-          </TouchableOpacity>
-        </LinearGradient>
+        <ActionButton
+          onPress={handleTransformSketch}
+          icon="sparkles"
+          text="Transform Sketch"
+          size="large"
+        />
       </View>
     </SafeAreaView>
   );
@@ -133,63 +113,19 @@ const DrawingScreen: React.FC<DrawingScreenProps> = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: { 
     flex: 1,
-    backgroundColor: '#F8F9FA',
-  },
-  header: {
-    padding: 16,
-    paddingTop: 16,
-  },
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 4,
-  },
-  iconContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 12,
-    padding: 8,
-    marginRight: 12,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#fff',
-  },
-  subtitle: {
-    fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.9)',
-    textAlign: 'center',
+    backgroundColor: COLORS.BACKGROUND,
   },
   canvasSection: {
     flex: 1,
     margin: 16,
   },
-  decorationCircle: {
-    position: 'absolute',
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: 'rgba(80, 227, 194, 0.1)',
-    top: -30,
-    right: -30,
-  },
-  decorationSquare: {
-    position: 'absolute',
-    width: 80,
-    height: 80,
-    transform: [{ rotate: '45deg' }],
-    backgroundColor: 'rgba(74, 144, 226, 0.1)',
-    bottom: 40,
-    left: -20,
-  },
   canvasContainer: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.WHITE,
     borderRadius: 24,
     overflow: 'hidden',
     elevation: 4,
-    shadowColor: '#000',
+    shadowColor: COLORS.TEXT.PRIMARY,
     shadowOffset: {
       width: 0,
       height: 4,
@@ -199,7 +135,7 @@ const styles = StyleSheet.create({
   },
   canvasInner: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.WHITE,
   },
   canvasOverlay: {
     position: 'absolute',
@@ -208,20 +144,20 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     borderWidth: 2,
-    borderColor: 'rgba(74, 144, 226, 0.2)',
+    borderColor: `${COLORS.PRIMARY}33`, // 20% opacity
     borderRadius: 24,
     borderStyle: 'dashed',
     pointerEvents: 'none',
   },
   toolbarSection: {
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.WHITE,
     paddingBottom: 0,
     paddingHorizontal: 16,
     borderTopWidth: 1,
-    borderTopColor: '#E5E5E5',
+    borderTopColor: COLORS.BORDER,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    shadowColor: '#000',
+    shadowColor: COLORS.TEXT.PRIMARY,
     shadowOffset: {
       width: 0,
       height: -4,
@@ -233,55 +169,20 @@ const styles = StyleSheet.create({
   buttonSection: {
     paddingHorizontal: 16,
     paddingBottom: 16,
-    backgroundColor: '#fff',
-  },
-  transformButton: {
-    borderRadius: 20,
-    shadowColor: '#FF6B6B',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  transformButtonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-  },
-  buttonIcon: {
-    marginRight: 8,
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '700',
-    letterSpacing: 0.5,
+    backgroundColor: COLORS.WHITE,
   },
   saveButton: {
     position: 'absolute',
     top: 12,
     right: 12,
     elevation: 3,
-    shadowColor: '#000',
+    shadowColor: COLORS.TEXT.PRIMARY,
     shadowOffset: {
       width: 0,
       height: 2,
     },
     shadowOpacity: 0.15,
     shadowRadius: 3,
-  },
-  saveButtonGradient: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
 });
 
