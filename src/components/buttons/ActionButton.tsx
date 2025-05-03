@@ -3,6 +3,7 @@ import {
   TouchableOpacity,
   Text,
   StyleSheet,
+  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -10,10 +11,17 @@ import { COLORS, GRADIENT_COLORS } from '../../constants/theme';
 
 type ButtonSize = 'small' | 'medium' | 'large';
 
-const BUTTON_SIZES: Record<ButtonSize, { height: number; fontSize: number; iconSize: number }> = {
-  small: { height: 40, fontSize: 14, iconSize: 18 },
-  medium: { height: 48, fontSize: 16, iconSize: 20 },
-  large: { height: 56, fontSize: 18, iconSize: 24 },
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+const BUTTON_SIZES: Record<ButtonSize, { 
+  height: number; 
+  width: number;
+  fontSize: number; 
+  iconSize: number 
+}> = {
+  small: { height: 40, width: SCREEN_WIDTH * 0.3, fontSize: 14, iconSize: 18 },
+  medium: { height: 60, width: SCREEN_WIDTH * 0.4, fontSize: 18, iconSize: 24 },
+  large: { height: 56, width: SCREEN_WIDTH * 0.85, fontSize: 18, iconSize: 24 },
 };
 
 interface ActionButtonProps {
@@ -21,7 +29,7 @@ interface ActionButtonProps {
   icon?: keyof typeof Ionicons.glyphMap;
   text: string;
   size?: ButtonSize;
-  variant?: 'primary' | 'secondary';
+  variant?: 'primary' | 'secondary' | 'action';
   disabled?: boolean;
 }
 
@@ -33,8 +41,12 @@ const ActionButton: React.FC<ActionButtonProps> = ({
   variant = 'secondary',
   disabled = false,
 }) => {
-  const { height, fontSize, iconSize } = BUTTON_SIZES[size];
-  const gradientColors = variant === 'primary' ? GRADIENT_COLORS.PRIMARY : GRADIENT_COLORS.SECONDARY;
+  const { height, width, fontSize, iconSize } = BUTTON_SIZES[size];
+  let gradientColors: readonly [string, string] = variant === 'primary' ? GRADIENT_COLORS.PRIMARY : GRADIENT_COLORS.SECONDARY;
+  
+  if (variant === 'action') {
+    gradientColors = GRADIENT_COLORS.ACTION;
+  }
 
   return (
     <TouchableOpacity
@@ -43,14 +55,17 @@ const ActionButton: React.FC<ActionButtonProps> = ({
       activeOpacity={0.8}
       style={[
         styles.button,
-        { opacity: disabled ? 0.6 : 1 }
+        { width, opacity: disabled ? 0.6 : 1 }
       ]}
     >
       <LinearGradient
         colors={gradientColors}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}
-        style={[styles.gradientContent, { height }]}
+        style={[
+          styles.gradientContent,
+          { height }
+        ]}
       >
         {icon && (
           <Ionicons
@@ -60,7 +75,10 @@ const ActionButton: React.FC<ActionButtonProps> = ({
             style={styles.icon}
           />
         )}
-        <Text style={[styles.text, { fontSize }]}>{text}</Text>
+        <Text style={[
+          styles.text,
+          { fontSize }
+        ]}>{text}</Text>
       </LinearGradient>
     </TouchableOpacity>
   );
@@ -75,6 +93,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    marginHorizontal: 6,
   },
   gradientContent: {
     flexDirection: 'row',
@@ -88,7 +107,7 @@ const styles = StyleSheet.create({
   text: {
     color: COLORS.TEXT.LIGHT,
     fontWeight: '600',
-  },
+  }
 });
 
 export default ActionButton; 

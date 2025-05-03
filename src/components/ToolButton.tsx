@@ -1,13 +1,21 @@
 // src/components/ToolButton.tsx
 import React from 'react';
-import { TouchableOpacity, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { TouchableOpacity, StyleSheet, Image } from 'react-native';
 
 interface ToolButtonProps {
-  iconName: any; // Ionicons name
+  iconName: string;
   onPress: () => void;
   active?: boolean;
 }
+
+const iconMap = {
+  'brush': require('../../assets/utils/paintbrush.pointed.fill.png'),
+  'remove-outline': require('../../assets/utils/eraser.fill.png'),
+  'arrow-undo': require('../../assets/utils/arrow.uturn.backward.png'),
+  'arrow-redo': require('../../assets/utils/arrow.uturn.forward.png'),
+  'trash': require('../../assets/utils/trash.fill.png'),
+  'color-palette': require('../../assets/utils/paintpalette.fill.png'),
+} as const;
 
 const ToolButton: React.FC<ToolButtonProps> = ({
   iconName,
@@ -15,17 +23,19 @@ const ToolButton: React.FC<ToolButtonProps> = ({
   active = false,
 }) => {
   return (
-  <TouchableOpacity
+    <TouchableOpacity
       style={[styles.button, active && styles.activeButton]}
-    onPress={onPress}
-  >
-    <Ionicons
-      name={iconName}
-      size={24}
-        color={active ? '#007AFF' : '#333'}
-    />
-  </TouchableOpacity>
-);
+      onPress={onPress}
+    >
+      <Image
+        source={iconMap[iconName as keyof typeof iconMap]}
+        style={[
+          styles.icon,
+          { tintColor: active ? '#007AFF' : '#333' }
+        ]}
+      />
+    </TouchableOpacity>
+  );
 };
 
 const styles = StyleSheet.create({
@@ -40,6 +50,11 @@ const styles = StyleSheet.create({
   activeButton: {
     backgroundColor: '#E8F1FF',
   },
+  icon: {
+    width: 24,
+    height: 24,
+    resizeMode: 'contain'
+  }
 });
 
 export default ToolButton;

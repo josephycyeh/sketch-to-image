@@ -70,7 +70,7 @@ export default function App() {
               options={{
                 header: () => (
                   <DrawingHeader
-                    title="Create Your Sketch"
+                    title="Create your masterpiece"
                     subtitle="Draw anything and transform it into art!"
                   />
                 ),

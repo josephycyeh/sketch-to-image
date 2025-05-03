@@ -151,12 +151,14 @@ const TransformationScreen: React.FC<TransformationScreenProps> = ({
                 icon="share-outline"
                 text="Share"
                 size="medium"
+                variant="action"
               />
               <ActionButton
                 onPress={handleSave}
                 icon={saving ? "cloud-download-outline" : "save-outline"}
                 text={saving ? 'Saving...' : 'Save'}
                 size="medium"
+                variant="action"
                 disabled={saving}
               />
             </View>
@@ -189,7 +191,7 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 20,
-    paddingTop: 36,
+    paddingTop: 20,
   },
   resultCanvasWrapper: {
     width: width * 0.9,
@@ -213,7 +215,6 @@ const styles = StyleSheet.create({
   actionsContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 12,
     marginBottom: 32,
     paddingHorizontal: 20,
   },

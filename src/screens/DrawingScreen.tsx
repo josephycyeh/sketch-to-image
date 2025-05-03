@@ -170,6 +170,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 16,
     backgroundColor: COLORS.WHITE,
+    alignItems: "center"
   },
   saveButton: {
     position: 'absolute',

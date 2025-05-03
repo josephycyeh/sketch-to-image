@@ -14,11 +14,6 @@ interface Point {
   y: number;
 }
 
-const getMidPoint = (p1: Point, p2: Point): Point => ({
-  x: (p1.x + p2.x) / 2,
-  y: (p1.y + p2.y) / 2,
-});
-
 // Memoized component for individual path rendering
 const PathDrawing = memo(({ pathData }: { pathData: PathData }) => (
   <Path
@@ -43,6 +38,7 @@ const DrawingCanvas: React.FC = () => {
 
   const lastPointRef = useRef<Point | null>(null);
   const pathRef = useRef<SkPath | null>(null);
+  const pathIndexRef = useRef<number>(-1);
   
   // Memoize paths rendering
   const renderedPaths = useMemo(() => 
@@ -51,12 +47,17 @@ const DrawingCanvas: React.FC = () => {
     ))
   , [paths]);
 
+  const getMidPoint = (p1: Point, p2: Point): Point => ({
+    x: (p1.x + p2.x) / 2,
+    y: (p1.y + p2.y) / 2,
+  });
+
   // Create PanResponder with useMemo for better performance
   const panResponder = useMemo(() => PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
+    onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: (evt) => {
-        const { locationX: x, locationY: y } = evt.nativeEvent;
+    onPanResponderGrant: (evt) => {
+      const { locationX: x, locationY: y } = evt.nativeEvent;
       const newPath = Skia.Path.Make();
       newPath.moveTo(x, y);
       
@@ -71,15 +72,17 @@ const DrawingCanvas: React.FC = () => {
       };
 
       dispatch({ type: 'ADD_PATH', payload: pathData });
+      pathIndexRef.current = paths.length;
     },
     onPanResponderMove: (evt) => {
       const { locationX: x, locationY: y } = evt.nativeEvent;
-      if (lastPointRef.current && pathRef.current) {
+      if (lastPointRef.current && pathRef.current && pathIndexRef.current !== -1) {
         const currentPoint = { x, y };
         const midPoint = getMidPoint(lastPointRef.current, currentPoint);
 
         // Create a smooth curve using quadratic bezier
-        pathRef.current.quadTo(
+        const path = pathRef.current;
+        path.quadTo(
           lastPointRef.current.x,
           lastPointRef.current.y,
           midPoint.x,
@@ -87,37 +90,55 @@ const DrawingCanvas: React.FC = () => {
         );
 
         const pathData: PathData = {
-          path: pathRef.current,
+          path: path.copy(), // Create a copy to prevent mutations
           color: currentTool === 'eraser' ? 'transparent' : currentColor,
           strokeWidth: currentStrokeWidth,
           tool: currentTool,
         };
 
-        dispatch({ type: 'ADD_PATH', payload: pathData });
+        // Update the current path instead of adding a new one
+        dispatch({ 
+          type: 'UPDATE_PATH', 
+          payload: { 
+            index: pathIndexRef.current,
+            path: pathData 
+          }
+        });
+        
         lastPointRef.current = currentPoint;
-        }
-      },
-      onPanResponderRelease: () => {
-      if (lastPointRef.current && pathRef.current) {
-        pathRef.current.lineTo(lastPointRef.current.x, lastPointRef.current.y);
+      }
+    },
+    onPanResponderRelease: () => {
+      if (lastPointRef.current && pathRef.current && pathIndexRef.current !== -1) {
+        const path = pathRef.current;
+        path.lineTo(lastPointRef.current.x, lastPointRef.current.y);
         
         const pathData: PathData = {
-          path: pathRef.current,
+          path: path.copy(), // Create a copy to prevent mutations
           color: currentTool === 'eraser' ? 'transparent' : currentColor,
           strokeWidth: currentStrokeWidth,
           tool: currentTool,
         };
         
-        dispatch({ type: 'ADD_PATH', payload: pathData });
+        // Finalize the path and add it to undo stack
+        dispatch({ 
+          type: 'FINALIZE_PATH', 
+          payload: { 
+            index: pathIndexRef.current,
+            path: pathData 
+          }
+        });
       }
       lastPointRef.current = null;
       pathRef.current = null;
-      },
-      onPanResponderTerminate: () => {
+      pathIndexRef.current = -1;
+    },
+    onPanResponderTerminate: () => {
       lastPointRef.current = null;
       pathRef.current = null;
-      },
-  }), [currentColor, currentStrokeWidth, currentTool]);
+      pathIndexRef.current = -1;
+    },
+  }), [currentColor, currentStrokeWidth, currentTool, paths.length]);
 
   return (
     <View style={styles.container} {...panResponder.panHandlers}>

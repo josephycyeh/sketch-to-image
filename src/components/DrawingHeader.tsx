@@ -1,6 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, Platform, StatusBar } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { View, Text, StyleSheet, Platform, StatusBar, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -27,9 +26,7 @@ const DrawingHeader: React.FC<DrawingHeaderProps> = ({ title, subtitle, style })
       ]}
     >
       <View style={styles.titleContainer}>
-        <View style={styles.iconContainer}>
-          <Ionicons name="brush" size={24} color="#fff" />
-        </View>
+      
         <Text style={styles.title}>{title}</Text>
       </View>
       {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
@@ -54,6 +51,15 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 8,
     marginRight: 12,
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  icon: {
+    width: 24,
+    height: 24,
+    tintColor: '#fff',
   },
   title: {
     fontSize: 28,

@@ -2,7 +2,7 @@
   "expo": {
     "name": "draw-app",
     "slug": "draw-app",
-    "version": "1.0.0",
+    "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -13,8 +13,8 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.jojo39381.drawapp",
+      "supportsTablet": false,
+      "bundleIdentifier": "com.caladanapps.picasso",
       "deploymentTarget": "18.0"
     },
     "android": {
@@ -22,13 +22,18 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.jojo39381.drawapp"
+      "package": "com.caladanapps.picasso"
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
       "expo-build-properties"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "32b7872d-7f95-4dce-a829-93a348555a7f"
+      }
+    }
   }
 }

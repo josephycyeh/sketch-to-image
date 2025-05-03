@@ -89,7 +89,7 @@ const StyleCard = memo(({
         <Image
           source={{ 
             uri: item.thumbnail,
-            cache: 'force-cache',
+            cache: 'default',
           }}
           style={[
             componentStyles.thumbnail,
@@ -97,6 +97,10 @@ const StyleCard = memo(({
           ]}
           resizeMode="cover"
           onLoadEnd={() => setImageLoading(false)}
+          onError={(error) => {
+            console.error('Image loading error:', error.nativeEvent.error, 'for URI:', item.thumbnail);
+            setImageLoading(false); // Still hide loader on error
+          }}
         />
         {/* Overlay with style name */}
         <LinearGradient
@@ -254,7 +258,6 @@ const StyleSelectionScreen: React.FC<StyleSelectionScreenProps> = ({
           decelerationRate="fast"
           snapToAlignment="center"
           getItemLayout={getItemLayout}
-          removeClippedSubviews={true}
           maxToRenderPerBatch={5}
           windowSize={3}
           initialNumToRender={3}
@@ -450,7 +453,6 @@ const componentStyles = StyleSheet.create({
   },
   imageWrapper: {
     flex: 1,
-    borderRadius: 16,
     overflow: 'hidden',
   },
   thumbnail: {
@@ -475,6 +477,8 @@ const componentStyles = StyleSheet.create({
   footer: {
     paddingHorizontal: 20,
     paddingBottom: 20,
+    alignItems: "center",
+
   },
   imagePlaceholder: {
     position: 'absolute',

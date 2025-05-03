@@ -1,6 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Platform, StatusBar } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { View, Text, StyleSheet, TouchableOpacity, Platform, StatusBar, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -30,7 +29,10 @@ const StyleSelectionHeader: React.FC<StyleSelectionHeaderProps> = ({ onBack, sty
           style={styles.backButton}
           onPress={onBack}
         >
-          <Ionicons name="arrow-back" size={24} color="#fff" />
+          <Image 
+            source={require('../../assets/utils/arrow.backward.png')}
+            style={styles.icon}
+          />
         </TouchableOpacity>
         
         <View style={styles.titleContainer}>
@@ -53,7 +55,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 5,
   },
   backButton: {
     width: 40,
@@ -62,6 +64,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     borderRadius: 20,
+  },
+  icon: {
+    width: 24,
+    height: 24,
+    tintColor: '#fff',
+    resizeMode: 'contain'
   },
   titleContainer: {
     flex: 1,

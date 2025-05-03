@@ -37,6 +37,7 @@ const TransformingScreen: React.FC<TransformingScreenProps> = ({ navigation, rou
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    const controller = new AbortController();
     const transformImage = async () => {
       try {
         setError(null);
@@ -49,26 +50,38 @@ const TransformingScreen: React.FC<TransformingScreenProps> = ({ navigation, rou
             'X-API-Key': API_KEY,
             'Content-Type': 'application/json',
           },
+          signal: controller.signal
         });
         if (response.data?.success && response.data.image?.data) {
-          navigation.replace('Transformation', {
-            sketchImage,
-            selectedStyle,
-            transformedImage: response.data.image.data,
-          });
+          if (!controller.signal.aborted) {
+            navigation.replace('Transformation', {
+              sketchImage,
+              selectedStyle,
+              transformedImage: response.data.image.data,
+            });
+          }
         } else {
-          throw new Error('Invalid response format from server');
+          if (!controller.signal.aborted) {
+            throw new Error('Invalid response format from server');
+          }
         }
       } catch (err) {
-        setError('Failed to transform image. Please try again.');
+        if (axios.isCancel(err)) {
+          console.log('Request canceled:', err.message);
+        } else if (!controller.signal.aborted) {
+          setError('Failed to transform image. Please try again.');
+        }
       }
     };
     transformImage();
+
+    return () => {
+      controller.abort();
+    };
   }, [sketchImage, selectedStyle, model, navigation]);
 
   const handleRetry = () => {
     setError(null);
-    // re-run effect
     navigation.replace('Transforming', { sketchImage, selectedStyle, model });
   };
 
