@@ -12,7 +12,6 @@ import {
   Pressable,
   Alert,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
@@ -20,7 +19,6 @@ import type { RootStackParamList } from '../../App';
 import axios from 'axios';
 import { API_KEY, URL } from '@env';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import StyleSelectionHeader from '../components/StyleSelectionHeader';
 import { COLORS, GRADIENT_COLORS } from '../constants/theme';
 import { MODEL_OPTIONS, ModelType } from '../constants/models';
 import ActionButton from '../components/buttons/ActionButton';
@@ -119,6 +117,115 @@ const StyleCard = memo(({
   );
 });
 
+const SketchPreview = memo(({ sketchImage }: { sketchImage: string }) => (
+  <View style={containerStyle.sketchContainer}>
+    <View style={containerStyle.sketchWrapper}>
+      <Image
+        source={{ uri: `data:image/png;base64,${sketchImage}` }}
+        style={containerStyle.sketchImage}
+        resizeMode="contain"
+      />
+    </View>
+    <Text style={containerStyle.toggleInstruction}>
+      Select a model and style to transform your sketch
+    </Text>
+  </View>
+));
+
+const ModelToggle = memo(({ 
+  selectedModel, 
+  onModelSwitch 
+}: { 
+  selectedModel: ModelType;
+  onModelSwitch: (model: ModelType) => void;
+}) => (
+  <View style={containerStyle.modelToggleWrapper}>
+    {MODEL_OPTIONS.map(option => (
+      <TouchableOpacity
+        key={option.value}
+        style={[
+          containerStyle.modelToggleButton,
+          selectedModel === option.value && containerStyle.modelToggleButtonActive
+        ]}
+        onPress={() => onModelSwitch(option.value as ModelType)}
+        activeOpacity={0.85}
+      >
+        <Text style={[
+          containerStyle.modelToggleText,
+          selectedModel === option.value && containerStyle.modelToggleTextActive
+        ]}>
+          {option.label}
+        </Text>
+      </TouchableOpacity>
+    ))}
+  </View>
+));
+
+const StylesList = memo(({ 
+  styles, 
+  selectedStyle, 
+  onStyleSelect 
+}: { 
+  styles: Style[];
+  selectedStyle: string | null;
+  onStyleSelect: (style: Style) => void;
+}) => {
+  const renderItem = useCallback(({ item }: { item: Style }) => (
+    <StyleCard
+      item={item}
+      isSelected={selectedStyle === item.id}
+      onSelect={onStyleSelect}
+    />
+  ), [selectedStyle, onStyleSelect]);
+
+  const keyExtractor = useCallback((item: Style) => item.id, []);
+
+  const getItemLayout = useCallback((data: ArrayLike<Style> | null | undefined, index: number) => ({
+    length: cardWidth,
+    offset: (cardWidth + 16) * index,
+    index,
+  }), []);
+
+  return (
+    <View style={componentStyles.stylesSection}>
+      <FlatList
+        data={styles}
+        renderItem={renderItem}
+        keyExtractor={keyExtractor}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={componentStyles.gridContainer}
+        snapToInterval={cardWidth + 16}
+        decelerationRate="fast"
+        snapToAlignment="center"
+        getItemLayout={getItemLayout}
+        maxToRenderPerBatch={5}
+        windowSize={3}
+        initialNumToRender={3}
+      />
+    </View>
+  );
+});
+
+const TransformButton = memo(({ 
+  selectedStyle, 
+  onContinue 
+}: { 
+  selectedStyle: string | null;
+  onContinue: () => void;
+}) => (
+  <View style={componentStyles.footer}>
+    <ActionButton
+      onPress={selectedStyle ? onContinue : () => {}}
+      text="Transform Sketch"
+      icon="arrow-forward"
+      size="large"
+      variant="primary"
+      disabled={!selectedStyle}
+    />
+  </View>
+));
+
 const StyleSelectionScreen: React.FC<StyleSelectionScreenProps> = ({
   navigation,
   route,
@@ -128,7 +235,6 @@ const StyleSelectionScreen: React.FC<StyleSelectionScreenProps> = ({
   const [loading, setLoading] = useState(true);
   const [selectedModel, setSelectedModel] = useState<ModelType>('gemini');
   const { sketchImage } = route.params;
-  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     const fetchStyles = async () => {
@@ -189,120 +295,35 @@ const StyleSelectionScreen: React.FC<StyleSelectionScreenProps> = ({
     }
   }, [selectedStyle, styles, navigation, sketchImage, selectedModel]);
 
-  const renderItem = useCallback(({ item }: { item: Style }) => {
-    const isSelected = selectedStyle === item.id;
-    return (
-      <StyleCard
-        item={item}
-        isSelected={isSelected}
-        onSelect={handleStyleSelect}
-      />
-    );
-  }, [selectedStyle, handleStyleSelect]);
-
-  const keyExtractor = useCallback((item: Style) => item.id, []);
-
-  const getItemLayout = useCallback((data: ArrayLike<Style> | null | undefined, index: number) => ({
-    length: cardWidth,
-    offset: (cardWidth + 16) * index,
-    index,
-  }), []);
-
-  const renderContent = () => (
-    <SafeAreaView style={containerStyle.container}>
-      {/* Sketch and rest of UI */}
-      <View style={containerStyle.sketchContainer}>
-        <View style={containerStyle.sketchWrapper}>
-          <Image
-            source={{ uri: `data:image/png;base64,${sketchImage}` }}
-            style={containerStyle.sketchImage}
-            resizeMode="contain"
-          />
-        </View>
-        {/* Single compact instruction */}
-        <Text style={containerStyle.toggleInstruction}>
-          Select a model and style to transform your sketch
-        </Text>
-        {/* Modern pill/segmented toggle */}
-        <View style={containerStyle.modelToggleWrapper}>
-          {MODEL_OPTIONS.map(option => (
-            <TouchableOpacity
-              key={option.value}
-              style={[
-                containerStyle.modelToggleButton,
-                selectedModel === option.value && containerStyle.modelToggleButtonActive
-              ]}
-              onPress={() => handleModelSwitch(option.value as ModelType)}
-              activeOpacity={0.85}
-            >
-              <Text style={[
-                containerStyle.modelToggleText,
-                selectedModel === option.value && containerStyle.modelToggleTextActive
-              ]}>
-                {option.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-
-      <View style={componentStyles.stylesSection}>
-        <FlatList
-          data={styles}
-          renderItem={renderItem}
-          keyExtractor={keyExtractor}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={componentStyles.gridContainer}
-          snapToInterval={cardWidth + 16}
-          decelerationRate="fast"
-          snapToAlignment="center"
-          getItemLayout={getItemLayout}
-          maxToRenderPerBatch={5}
-          windowSize={3}
-          initialNumToRender={3}
-        />
-      </View>
-
-      <View style={componentStyles.footer}>
-        {selectedStyle ? (
-          <ActionButton
-            onPress={handleContinue}
-            text="Transform Sketch"
-            icon="arrow-forward"
-            size="large"
-            variant="primary"
-          />
-        ) : (
-          <ActionButton
-            onPress={() => {}}
-            text="Transform Sketch"
-            icon="arrow-forward"
-            size="large"
-            variant="primary"
-            disabled
-          />
-        )}
-      </View>
-    </SafeAreaView>
-  );
-
   if (loading) {
     return (
-      <LinearGradient colors={GRADIENT_COLORS.PRIMARY} style={{ flex: 1 }}>
-        <SafeAreaView style={containerStyle.container}>
-          <View style={containerStyle.loadingContainer}>
-            <ActivityIndicator size="large" color={COLORS.WHITE} />
-            <Text style={containerStyle.loadingText}>Loading styles...</Text>
-          </View>
-        </SafeAreaView>
-      </LinearGradient>
+      <SafeAreaView style={[containerStyle.container, { backgroundColor: COLORS.BACKGROUND }]}>
+        <View style={containerStyle.loadingContainer}>
+          <ActivityIndicator size="large" color={COLORS.PRIMARY} />
+          <Text style={containerStyle.loadingText}>Loading styles...</Text>
+        </View>
+      </SafeAreaView>
     );
   }
 
   return (
     <LinearGradient colors={BG_GRADIENT} style={{ flex: 1 }}>
-      {renderContent()}
+      <SafeAreaView style={containerStyle.container}>
+        <SketchPreview sketchImage={sketchImage} />
+        <ModelToggle 
+          selectedModel={selectedModel} 
+          onModelSwitch={handleModelSwitch} 
+        />
+        <StylesList 
+          styles={styles} 
+          selectedStyle={selectedStyle} 
+          onStyleSelect={handleStyleSelect} 
+        />
+        <TransformButton 
+          selectedStyle={selectedStyle} 
+          onContinue={handleContinue} 
+        />
+      </SafeAreaView>
     </LinearGradient>
   );
 };

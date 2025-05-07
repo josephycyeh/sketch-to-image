@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "draw-app",
+    "name": "Picasso",
     "slug": "draw-app",
-    "version": "1.0.2",
+    "version": "1.0.5",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -16,6 +16,7 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.caladanapps.picasso",
       "deploymentTarget": "18.0"
+      
     },
     "android": {
       "adaptiveIcon": {
