@@ -16,7 +16,6 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.caladanapps.picasso",
       "deploymentTarget": "18.0"
-      
     },
     "android": {
       "adaptiveIcon": {
