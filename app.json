@@ -2,7 +2,7 @@
   "expo": {
     "name": "Picasso",
     "slug": "draw-app",
-    "version": "1.0.5",
+    "version": "1.0.6",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -29,7 +29,15 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-build-properties"
+      "expo-build-properties",
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow $(PRODUCT_NAME) to access your photos to save and share your masterpieces.",
+          "savePhotosPermission": "Allow $(PRODUCT_NAME) to save your masterpieces to your photo library.",
+          "isAccessMediaLocationEnabled": true
+        }
+      ]
     ],
     "extra": {
       "eas": {
